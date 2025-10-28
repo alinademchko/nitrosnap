@@ -1,6 +1,17 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+@layer base {
+  .snapshot-form button {
+    @apply w-full px-4 py-[14px] rounded-[12px] font-extrabold tracking-[0.02em]
+           border border-[rgba(5,63,53,0.08)] bg-[var(--accent)] text-[var(--accent-ink)]
+           shadow-[0_10px_18px_rgba(184,255,242,0.35)]
+           transition-[transform_.04s_ease,box-shadow_.2s_ease,background-color_.15s_ease,filter_.2s_ease]
+           hover:bg-[var(--accent-hover)] hover:-translate-y-px hover:shadow-[0_14px_24px_rgba(184,255,242,0.42)]
+           active:translate-y-0 active:saturate-[0.98]
+           disabled:opacity-[0.65] disabled:cursor-default disabled:translate-y-0 disabled:shadow-none;
+  }
+}
 :root {
   color-scheme: light;
   --bg: #f6f7fb;
