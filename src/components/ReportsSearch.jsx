@@ -93,7 +93,7 @@ export default function ReportsSearch({ onOpen }) {
           />
           <button
             type="submit"
-            className="w-full px-4 py-[14px] rounded-[12px] font-extrabold tracking-[0.02em]
+            className="flex-[0_0_50%] w-full px-4 py-[14px] rounded-[12px] font-extrabold tracking-[0.02em]
             border border-[rgba(5,63,53,0.08)] bg-[var(--accent)] text-[var(--accent-ink)]
             shadow-[0_10px_18px_rgba(184,255,242,0.35)]
             transition-[transform_.04s_ease,box-shadow_.2s_ease,background-color_.15s_ease,filter_.2s_ease]

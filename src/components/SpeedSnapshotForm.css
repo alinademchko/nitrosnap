@@ -494,9 +494,7 @@ img, svg, canvas, video {
          min-width: 0;
        }
   
-       .snapshot-form button {
-         width: 100%;
-       }
+       
   
        .comparison {
          display: block;
