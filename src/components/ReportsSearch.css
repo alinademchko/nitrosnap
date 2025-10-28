@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Mobile overrides */
+@media (max-width: 640px) {
+    .search { padding: 16px !important; }
+
+    .search__title {
+      font-size: 22px;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .search__hint { font-size: 13px; }
+
+    .search__form {
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .search__inputWrap {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      grid-template-areas:
+        "icon input"
+        "button button";
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+    }
+
+    .search__icon {
+      grid-area: icon;
+      font-size: 18px;
+      opacity: 0.7;
+      margin: 0;
+      justify-self: center;
+      pointer-events: none;
+    }
+
+    .search__input {
+      grid-area: input;
+      min-width: 0;
+      width: 100%;
+      padding-left: 0;
+    }
+
+    .search__btn {
+      grid-area: button;
+      width: 100%;
+      flex: 0 0 auto;
+      justify-content: center;
+    }
+
+    /* Results list */
+    .search__results {
+      margin-top: 12px;
+      padding-left: 0;
+      grid-template-columns: 1fr;
+
+    .resultCard {
+      max-width: 100%;
+      overflow: hidden;
+      margin: 10px 0;
+      padding: 10px 12px;
+      border-radius: 12px;
+    }
+
+    .resultCard__top {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      white-space: normal;
+      overflow: visible;
+      min-height: unset;
+    }
+
+    .resultCard__top > * { min-width: 0; }
+
+    .badge, .chip { max-width: 100%; }
+
+    .resultCard__url {
+      margin: 6px 0;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
+
+    .chip,
+    .badge,
+    .score {
+      font-size: 12px;
+    }
+
+    .date {
+      margin-left: auto;
+      flex: 0 0 auto;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+  }
+}
