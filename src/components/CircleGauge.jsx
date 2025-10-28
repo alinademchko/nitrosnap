@@ -52,7 +52,7 @@ export default function CircleGauge({
         </g>
       </svg>
       <div className="absolute inset-0 flex flex-col text-center items-center justify-center">
-        <div className="font-bold text-[42px] leading-[1.1] text-[#1b024e]">{pct}</div>
+        <div className="font-bold text-[42px] leading-[1.1] text-percentage">{pct}</div>
         {label && <div className="mt-1 text-[16px] font-normal leading-none tracking-[0] text-[#1b024e]">{label}</div>}
       </div>
     </div>

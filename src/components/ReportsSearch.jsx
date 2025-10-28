@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import './ReportsSearch.css';
+import styles from './SearchButton.module.css';
+
 
 const API_BASE =
   process.env.NODE_ENV === 'development'
@@ -93,13 +95,7 @@ export default function ReportsSearch({ onOpen }) {
           />
           <button
             type="submit"
-            className="flex-[0_0_50%] w-full px-4 py-[14px] rounded-[12px] font-extrabold tracking-[0.02em]
-            border border-[rgba(5,63,53,0.08)] bg-[var(--accent)] text-[var(--accent-ink)]
-            shadow-[0_10px_18px_rgba(184,255,242,0.35)]
-            transition-[transform_.04s_ease,box-shadow_.2s_ease,background-color_.15s_ease,filter_.2s_ease]
-            hover:bg-[var(--accent-hover)] hover:-translate-y-px hover:shadow-[0_14px_24px_rgba(184,255,242,0.42)]
-            active:translate-y-0 active:saturate-[0.98] disabled:opacity-65 disabled:cursor-default
-            disabled:translate-y-0 disabled:shadow-none"
+            className={styles.button}
             disabled={loading}
             aria-busy={loading ? "true" : "false"}
           >
@@ -138,19 +134,19 @@ export default function ReportsSearch({ onOpen }) {
                     {(r.device || "mobile").toLowerCase()}
                   </span>
                   {r.case_id ? (
-                    <span className="min-w-0 max-w-[45%] truncate rounded-full bg-[#eef2ff] text-[#3730a3] py-0.5 px-2 font-semibold">Case: {r.case_id}</span>
+                    <span className="min-w-0 max-w-[45%] truncate rounded-full bg-casebg text-case py-0.5 px-2 font-semibold">Case: {r.case_id}</span>
                   ) : null}
-                  <span className="min-w-0 max-w-[45%] truncate rounded-full bg-[#eef2ff] text-[#3730a3] py-0.5 px-2 font-semibold">ID: {r.id}</span>
+                  <span className="min-w-0 max-w-[45%] truncate rounded-full bg-casebg text-case py-0.5 px-2 font-semibold">ID: {r.id}</span>
                   <span className="ml-auto text-xs text-[#6b7280]">
                     {new Date(r.created_at).toLocaleString()}
                   </span>
                 </div>
 
-                <div className="text-[14px] text-[#111827] overflow-hidden text-ellipsis whitespace-nowrap mb-[6px]">{r.url}</div>
+                <div className="text-[14px] text-text overflow-hidden text-ellipsis whitespace-nowrap mb-[6px]">{r.url}</div>
 
                 <div className="flex gap-2.5 items-center font-semibold">
-                  <span className="text-[13px] text-[#059669]">With: {r.perf_with}</span>
-                  <span className="text-[13px] text-[#dc2626]">
+                  <span className="text-[13px] text-withnitro">With: {r.perf_with}</span>
+                  <span className="text-[13px] text-withoutnitro">
                     Without: {r.perf_without}
                   </span>
                 </div>
@@ -162,10 +158,10 @@ export default function ReportsSearch({ onOpen }) {
           {items.length > 6 && (
             <div className="mt-4">
               <button
-                className="inline-block w-full py-[14px] px-4 bg-[var(--accent)]
-                text-[var(--accent-ink)] border border-[rgba(5,63,53,.08)] rounded-[12px]
+                className="inline-block w-full py-[14px] px-4 bg-primary-50
+                text-primary-200 border border-300 rounded-[12px]
                 font-extrabold tracking-[0.02em] cursor-pointer transition: all 200ms ease-in-out
-                shadow-[0_10px_18px_rgba(184,255,242,.35)] hover:bg-[var(--accent-hover)] hover:-translate-y-[1px] hover:shadow-[0_14px_24px_rgba(184,255,242,.42)]
+                shadow-[0_10px_18px_rgba(184,255,242,.35)] hover:bg-primary-100 hover:-translate-y-[1px] hover:shadow-[0_14px_24px_rgba(184,255,242,.42)]
                 active:translate-y-0 active:saturate-[0.98] disabled:opacity-65 disabled:cursor-default disabled:transform-none disabled:shadow-none"
                 onClick={() => setShowAll(!showAll)}
                 type="button"
