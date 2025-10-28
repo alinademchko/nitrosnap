@@ -3,7 +3,7 @@
 @tailwind utilities;
 @layer base {
   .snapshot-form button {
-    @apply w-full px-4 py-[14px] rounded-[12px] font-extrabold tracking-[0.02em]
+    @apply w-full px-4 py-[12px] rounded-[12px] font-semibold text-[15px] tracking-[0.02em]
            border border-[rgba(5,63,53,0.08)] bg-[var(--accent)] text-[var(--accent-ink)]
            shadow-[0_10px_18px_rgba(184,255,242,0.35)]
            transition-[transform_.04s_ease,box-shadow_.2s_ease,background-color_.15s_ease,filter_.2s_ease]
