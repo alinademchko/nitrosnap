@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+
+
 /* Mobile overrides */
 @media (max-width: 640px) {
     .search { padding: 16px !important; }
@@ -61,7 +63,7 @@
       margin-top: 12px;
       padding-left: 0;
       grid-template-columns: 1fr;
-
+    }
     .resultCard {
       max-width: 100%;
       overflow: hidden;
@@ -104,4 +106,3 @@
       white-space: nowrap;
     }
   }
-}

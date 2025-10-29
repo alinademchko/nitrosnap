@@ -1,74 +1,100 @@
-import React, { useState } from 'react';
-import './ReportsSearch.css';
-import styles from './SearchButton.module.css';
-
+import React, { useState, useEffect } from "react";
+import "./ReportsSearch.css";
+import styles from "./SearchButton.module.css";
 
 const API_BASE =
-  process.env.NODE_ENV === 'development'
-    ? 'https://darkturquoise-antelope-174249.hostingersite.com'
-    : '';
+  process.env.NODE_ENV === "development"
+    ? "https://darkturquoise-antelope-174249.hostingersite.com"
+    : "";
 
 const GET_URL = `${API_BASE}/api/get_report.php`;
 
-export default function ReportsSearch({ onOpen }) {
-  const [q, setQ] = useState('');
+export default function ReportsSearch({
+  onOpen,
+  hideForm = false,
+  listAll = false,
+}) {
+  const [q, setQ] = useState("");
   const [items, setItems] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState('');
+  const [err, setErr] = useState("");
   const [searched, setSearched] = useState(false);
-  const [showAll, setShowAll] = useState(false); // State for show more/less toggle
+  const [showAll, setShowAll] = useState(false);
 
   async function request(paramsObj) {
     const params = new URLSearchParams(paramsObj);
     const res = await fetch(`${GET_URL}?${params.toString()}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json().catch(() => []);
-  }//Accepts a plain object 123 etc., converts it to a query string, Tries to parse JSON; on parse failure returns an empty array (so the UI doesn’t crash).
+  } //Accepts a plain object 123 etc., converts it to a query string, Tries to parse JSON; on parse failure returns an empty array (so the UI doesn’t crash).
+
+  useEffect(() => {
+    if (!listAll) return;
+    (async () => {
+      try {
+        setLoading(true);
+        setErr("");
+        const rows = await request({ limit: 200 });
+        setItems(Array.isArray(rows) ? rows : rows ? [rows] : []);
+        setShowAll(true);
+        setSearched(true);
+      } catch (e) {
+        console.error(e);
+        setErr("Could not load the reports list.");
+        setItems([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [listAll]);
 
   //The search flow
   async function doSearch(e) {
     e.preventDefault();
-    setErr('');
+    setErr("");
     const needle = q.trim();
     if (!needle) return;
-  
-    setSearched(true);//mark that a search was run
+
+    setSearched(true);
     setLoading(true);
-    setShowAll(false);// Reset showAll state on new search
+    setShowAll(false);
     try {
       let rows = [];
       const params = { limit: 100 }; // Request up to 100 results
       if (/^\d+$/.test(needle)) {
         rows = await request({ case_id: needle, ...params });
         if (!rows || (Array.isArray(rows) && rows.length === 0)) {
-          rows = await request({ id: needle });// fallback if no case_id match
+          rows = await request({ id: needle }); // fallback if no case_id match
         }
       } else if (/^https?:\/\//i.test(needle)) {
-        rows = await request({ url: needle, ...params });// full URL search
+        rows = await request({ url: needle, ...params }); // full URL search
       } else {
-        rows = await request({ case_id: needle, ...params });// default: case_id
+        rows = await request({ case_id: needle, ...params }); // default: case_id
       }
       setItems(Array.isArray(rows) ? rows : rows ? [rows] : []);
     } catch (e) {
-      console.error('Search failed:', e);
-      setErr('Could not load results. Please try again.');
+      console.error("Search failed:", e);
+      setErr("Could not load results. Please try again.");
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }//Normalize to an array so the UI can map cleanly
+  } //Normalize to an array so the UI can map cleanly
 
   function openFullRun(row) {
     if (!row?.group_id) return;
-    onOpen?.({
-      group_id: row.group_id,
-      device: row.device || 'mobile',
-      url: row.url || '',
-    });
+    if (onOpen) {
+      onOpen({
+        group_id: row.group_id,
+        device: row.device || "mobile",
+        url: row.url || "",
+      });
+    } else {
+      console.log("Report clicked:", row);
+    }
   }
 
-
-//Rendering: form + results
+  //Rendering: form + results
   return (
     <section className="my-6 mb-8 py-4 border-b border-[rgba(0,0,0,0.06)]">
       <h2 className="text-[28px] leading-[1.25] mb-1">Find Previous Reports</h2>
@@ -134,18 +160,26 @@ export default function ReportsSearch({ onOpen }) {
                     {(r.device || "mobile").toLowerCase()}
                   </span>
                   {r.case_id ? (
-                    <span className="min-w-0 max-w-[45%] truncate rounded-full bg-casebg text-case py-0.5 px-2 font-semibold">Case: {r.case_id}</span>
+                    <span className="min-w-0 max-w-[45%] truncate rounded-full bg-casebg text-case py-0.5 px-2 font-semibold">
+                      Case: {r.case_id}
+                    </span>
                   ) : null}
-                  <span className="min-w-0 max-w-[45%] truncate rounded-full bg-casebg text-case py-0.5 px-2 font-semibold">ID: {r.id}</span>
+                  <span className="min-w-0 max-w-[45%] truncate rounded-full bg-casebg text-case py-0.5 px-2 font-semibold">
+                    ID: {r.id}
+                  </span>
                   <span className="ml-auto text-xs text-[#6b7280]">
                     {new Date(r.created_at).toLocaleString()}
                   </span>
                 </div>
 
-                <div className="text-[14px] text-text overflow-hidden text-ellipsis whitespace-nowrap mb-[6px]">{r.url}</div>
+                <div className="text-[14px] text-text overflow-hidden text-ellipsis whitespace-nowrap mb-[6px]">
+                  {r.url}
+                </div>
 
                 <div className="flex gap-2.5 items-center font-semibold">
-                  <span className="text-[13px] text-withnitro">With: {r.perf_with}</span>
+                  <span className="text-[13px] text-withnitro">
+                    With: {r.perf_with}
+                  </span>
                   <span className="text-[13px] text-withoutnitro">
                     Without: {r.perf_without}
                   </span>

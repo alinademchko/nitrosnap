@@ -1,23 +1,31 @@
-import React, { useState, useRef } from 'react';
-import { fetchPSIReportSmart } from '../utils/psi-client-proxy';
-import './SpeedSnapshotForm.css';
-import ReportsSearch from './ReportsSearch';
-import './ReportsSearch.css';
+import React, { useState, useRef } from "react";
+import { fetchPSIReportSmart } from "../utils/psi-client-proxy";
+import "./SpeedSnapshotForm.css";
+import ReportsSearch from "./ReportsSearch";
+import "./ReportsSearch.css";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList
-} from 'recharts';
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  LabelList,
+} from "recharts";
 
 // PDF export libs
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
-import autoTable from 'jspdf-autotable';
-import ReactDOM from 'react-dom/client';
-import CircleGauge from './CircleGauge';
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import autoTable from "jspdf-autotable";
+import ReactDOM from "react-dom/client";
+import CircleGauge from "./CircleGauge";
 
 const API_BASE =
-  process.env.NODE_ENV === 'development'
-    ? 'https://darkturquoise-antelope-174249.hostingersite.com'
-    : '';
+  process.env.NODE_ENV === "development"
+    ? "https://darkturquoise-antelope-174249.hostingersite.com"
+    : "";
 
 export const API_URL = `${API_BASE}/api/save-report.php`;
 const GET_URL = `${API_BASE}/api/get_report.php`;
@@ -51,17 +59,20 @@ function normalizeUrl(input) {
   if (!input) return null;
   let s = String(input).trim();
 
-  s = s.replace(/^\s+|\s+$/g, '');
+  s = s.replace(/^\s+|\s+$/g, "");
 
-  if (s.startsWith('/') && /^[a-z0-9.-]+\.[a-z]{2,}([/:?].*)?$/i.test(s.slice(1))) {
+  if (
+    s.startsWith("/") &&
+    /^[a-z0-9.-]+\.[a-z]{2,}([/:?].*)?$/i.test(s.slice(1))
+  ) {
     s = s.slice(1);
   }
 
-  if (s.startsWith('//')) s = 'https:' + s;
+  if (s.startsWith("//")) s = "https:" + s;
 
   // If there is no scheme, add https://
   if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) {
-    s = 'https://' + s;
+    s = "https://" + s;
   }
 
   // missing trailing slash
@@ -74,261 +85,273 @@ function normalizeUrl(input) {
   }
 }
 
-  //Case ID helpers
-  const CASE_PREFIX = 'NS';
-  const pad2 = (n) => String(n).padStart(2, '0');
+//Case ID helpers
+const CASE_PREFIX = "NS";
+const pad2 = (n) => String(n).padStart(2, "0");
 
-  function generateCaseId() {
-    const d = new Date();
-    const yy = String(d.getFullYear()).slice(-2);
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mi = String(d.getMinutes()).padStart(2, '0');
-  
-    const rand2 = Math.floor(Math.random() * 100).toString().padStart(2, '0');
-  
-    // Final: YYMMDDHHMMRR (12 digits, all numbers)
-    return `${yy}${mm}${dd}${hh}${mi}${rand2}`;
-  }
-  
-  // check if a case_id already exists.
-  async function caseIdTaken(id) {
-    try {
-      const res = await fetch(`${GET_URL}?case_id=${encodeURIComponent(id)}`, { method: 'GET' });
-      if (!res.ok) return false;
-      const rows = await res.json();
-      return Array.isArray(rows) && rows.length > 0;
-    } catch {
-      return false;
-    }
-  }
+function generateCaseId() {
+  const d = new Date();
+  const yy = String(d.getFullYear()).slice(-2);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
 
-  async function getOrMakeCaseId(userInput) {
-    const wanted = (userInput || '').trim();
-  
-    if (wanted) {
-      if (await caseIdTaken(wanted)) {
-        const err = new Error(`Case ID "${wanted}" already exists. Please enter a different one.`);
-        err.code = 'CASE_ID_DUP';
-        throw err;
-      }
-      return wanted;
-    }
-  
-    // Auto-generate (retry a few times)
-    for (let i = 0; i < 5; i++) {
-      const auto = generateCaseId();
-      if (!(await caseIdTaken(auto))) return auto;
-    }
-    return generateCaseId();
-  }
+  const rand2 = Math.floor(Math.random() * 100)
+    .toString()
+    .padStart(2, "0");
 
-  async function renderChartPNGForStrategy(strategyResults, buildChartData) {
-    if (!strategyResults) return null;
-  
-    const container = document.createElement('div');
-    Object.assign(container.style, {
-      position: 'fixed',
-      left: '-10000px',
-      top: '0',
-      width: `${UI.CHART_W}px`,
-      height: `${UI.CHART_H}px`,
-      pointerEvents: 'none',
-      background: '#fff',
-      overflow: 'visible',
+  // Final: YYMMDDHHMMRR (12 digits, all numbers)
+  return `${yy}${mm}${dd}${hh}${mi}${rand2}`;
+}
+
+// check if a case_id already exists.
+async function caseIdTaken(id) {
+  try {
+    const res = await fetch(`${GET_URL}?case_id=${encodeURIComponent(id)}`, {
+      method: "GET",
     });
-    document.body.appendChild(container);
-  
-    const data = buildChartData(strategyResults);
-  
+    if (!res.ok) return false;
+    const rows = await res.json();
+    return Array.isArray(rows) && rows.length > 0;
+  } catch {
+    return false;
+  }
+}
 
-    const labelFmt = (value, _name, props) => {
-      const metric = props?.payload?.metric || '';
-      const n = Number(value);
-      if (!Number.isFinite(n)) return '';
-      if (metric.startsWith('TBT')) return `${Math.round(n)} ms`;
-      if (metric.startsWith('Perf')) return `${Math.round(n)}`;
-      if (metric === 'CLS')        return n.toFixed(3);
-      return `${n.toFixed(2)} s`;
+async function getOrMakeCaseId(userInput) {
+  const wanted = (userInput || "").trim();
+
+  if (wanted) {
+    if (await caseIdTaken(wanted)) {
+      const err = new Error(
+        `Case ID "${wanted}" already exists. Please enter a different one.`
+      );
+      err.code = "CASE_ID_DUP";
+      throw err;
+    }
+    return wanted;
+  }
+
+  // Auto-generate (retry a few times)
+  for (let i = 0; i < 5; i++) {
+    const auto = generateCaseId();
+    if (!(await caseIdTaken(auto))) return auto;
+  }
+  return generateCaseId();
+}
+
+async function renderChartPNGForStrategy(strategyResults, buildChartData) {
+  if (!strategyResults) return null;
+
+  const container = document.createElement("div");
+  Object.assign(container.style, {
+    position: "fixed",
+    left: "-10000px",
+    top: "0",
+    width: `${UI.CHART_W}px`,
+    height: `${UI.CHART_H}px`,
+    pointerEvents: "none",
+    background: "#fff",
+    overflow: "visible",
+  });
+  document.body.appendChild(container);
+
+  const data = buildChartData(strategyResults);
+
+  const labelFmt = (value, _name, props) => {
+    const metric = props?.payload?.metric || "";
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "";
+    if (metric.startsWith("TBT")) return `${Math.round(n)} ms`;
+    if (metric.startsWith("Perf")) return `${Math.round(n)}`;
+    if (metric === "CLS") return n.toFixed(3);
+    return `${n.toFixed(2)} s`;
+  };
+  const Chart = () => {
+    const raw = buildChartData(strategyResults);
+
+    // Caps so every metric has visible height
+    const CAPS = {
+      "FCP (s)": 3.0,
+      "LCP (s)": 4.0,
+      "TBT (ms)": 400,
+      CLS: 0.3,
+      "Perf. Score": 100,
     };
-    const Chart = () => {
-      const raw = buildChartData(strategyResults);
 
-      // Caps so every metric has visible height
-      const CAPS = {
-        "FCP (s)": 3.0,
-        "LCP (s)": 4.0,
-        "TBT (ms)": 400,
-        CLS: 0.3,
-        "Perf. Score": 100,
+    // PSI-like thresholds color
+    const THRESH = {
+      "FCP (s)": { good: 1.8, ni: 3.0 },
+      "LCP (s)": { good: 2.5, ni: 4.0 },
+      "TBT (ms)": { good: 200, ni: 600 },
+      CLS: { good: 0.1, ni: 0.25 },
+      "Perf. Score": { good: 90, ni: 50 },
+    };
+    const COLORS = { good: "#10b981", ni: "#f59e0b", poor: "#ef4444" };
+
+    const quality = (metric, v) => {
+      const t = THRESH[metric];
+      if (!Number.isFinite(v) || !t) return "ni";
+      if (metric === "Perf. Score")
+        return v >= t.good ? "good" : v >= t.ni ? "ni" : "poor";
+      return v <= t.good ? "good" : v <= t.ni ? "ni" : "poor";
+    };
+
+    const fmt = (metric, v) => {
+      if (!Number.isFinite(v)) return "—";
+      if (metric === "CLS") return v.toFixed(2);
+      if (metric.includes("(ms)")) return `${Math.round(v)} ms`;
+      if (metric.includes("(s)")) return `${v.toFixed(2)} s`;
+      if (metric.includes("Score")) return `${Math.round(v)}`;
+      return String(v);
+    };
+
+    // Per-row cap with +10% headroom so large values don’t flatten
+    const rowCap = (metric, withRaw, withoutRaw) => {
+      if (metric === "Perf. Score") return 100;
+      const base = CAPS[metric] ?? 100;
+      const maxRaw = Math.max(Number(withRaw) || 0, Number(withoutRaw) || 0);
+      return Math.max(base, maxRaw * 1.1);
+    };
+
+    // normalized data for bar heights +  raw numbers for labels
+    const data = raw.map((r) => {
+      const cap = rowCap(r.metric, r.WithNitro, r.WithoutNitro);
+      const withN = cap
+        ? Math.max(0, Math.min(100, ((Number(r.WithNitro) || 0) / cap) * 100))
+        : 0;
+      const withoutN = cap
+        ? Math.max(
+            0,
+            Math.min(100, ((Number(r.WithoutNitro) || 0) / cap) * 100)
+          )
+        : 0;
+
+      return {
+        metric: r.metric,
+        WithNitro: withN,
+        WithoutNitro: withoutN,
+        _withRaw: Number(r.WithNitro),
+        _withoutRaw: Number(r.WithoutNitro),
       };
+    });
 
-      // PSI-like thresholds color
-      const THRESH = {
-        "FCP (s)": { good: 1.8, ni: 3.0 },
-        "LCP (s)": { good: 2.5, ni: 4.0 },
-        "TBT (ms)": { good: 200, ni: 600 },
-        CLS: { good: 0.1, ni: 0.25 },
-        "Perf. Score": { good: 90, ni: 50 },
-      };
-      const COLORS = { good: "#10b981", ni: "#f59e0b", poor: "#ef4444" };
-
-      const quality = (metric, v) => {
-        const t = THRESH[metric];
-        if (!Number.isFinite(v) || !t) return "ni";
-        if (metric === "Perf. Score")
-          return v >= t.good ? "good" : v >= t.ni ? "ni" : "poor";
-        return v <= t.good ? "good" : v <= t.ni ? "ni" : "poor";
-      };
-
-      const fmt = (metric, v) => {
-        if (!Number.isFinite(v)) return "—";
-        if (metric === "CLS") return v.toFixed(2);
-        if (metric.includes("(ms)")) return `${Math.round(v)} ms`;
-        if (metric.includes("(s)")) return `${v.toFixed(2)} s`;
-        if (metric.includes("Score")) return `${Math.round(v)}`;
-        return String(v);
-      };
-
-      // Per-row cap with +10% headroom so large values don’t flatten
-      const rowCap = (metric, withRaw, withoutRaw) => {
-        if (metric === "Perf. Score") return 100;
-        const base = CAPS[metric] ?? 100;
-        const maxRaw = Math.max(Number(withRaw) || 0, Number(withoutRaw) || 0);
-        return Math.max(base, maxRaw * 1.1);
-      };
-
-      // normalized data for bar heights +  raw numbers for labels
-      const data = raw.map((r) => {
-        const cap = rowCap(r.metric, r.WithNitro, r.WithoutNitro);
-        const withN = cap
-          ? Math.max(0, Math.min(100, ((Number(r.WithNitro) || 0) / cap) * 100))
-          : 0;
-        const withoutN = cap
-          ? Math.max(
-              0,
-              Math.min(100, ((Number(r.WithoutNitro) || 0) / cap) * 100)
-            )
-          : 0;
-
-        return {
-          metric: r.metric,
-          WithNitro: withN,
-          WithoutNitro: withoutN,
-          _withRaw: Number(r.WithNitro),
-          _withoutRaw: Number(r.WithoutNitro),
-        };
-      });
-
-      // Colored labels
-      const labelRenderer = (series) => (props) => {
-        const { x, y, width, index } = props;
-        const row = data[index];
-        const metric = raw[index].metric;
-        const rawVal = series === "with" ? row._withRaw : row._withoutRaw;
-        const color = COLORS[quality(metric, rawVal)];
-        const text = fmt(metric, rawVal);
-        return (
-          <text
-            x={x + width / 2}
-            y={y - 6}
-            textAnchor="middle"
-            fontSize={12}
-            fontWeight={700}
-            fill={color}
-          >
-            {text}
-          </text>
-        );
-      };
-
+    // Colored labels
+    const labelRenderer = (series) => (props) => {
+      const { x, y, width, index } = props;
+      const row = data[index];
+      const metric = raw[index].metric;
+      const rawVal = series === "with" ? row._withRaw : row._withoutRaw;
+      const color = COLORS[quality(metric, rawVal)];
+      const text = fmt(metric, rawVal);
       return (
-        <div
-          style={{ width: UI.CHART_W, height: UI.CHART_H, background: "#fff" }}
+        <text
+          x={x + width / 2}
+          y={y - 6}
+          textAnchor="middle"
+          fontSize={12}
+          fontWeight={700}
+          fill={color}
         >
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={data}
-              margin={{ top: 24, right: 16, left: 8, bottom: 8 }}
-              barCategoryGap={24}
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="metric" />
-              {/* fixed headroom so labels don’t clip */}
-              <YAxis domain={[0, 111]} allowDecimals={false} tickFormatter={(val) => (val === 111 ? '100' : val)}/>
-              <Legend
-                verticalAlign="top"
-                align="center"
-                height={28}
-                formatter={(v) =>
-                  v === "WithNitro"
-                    ? "With NitroPack"
-                    : v === "WithoutNitro"
-                    ? "Without NitroPack"
-                    : v
-                }
-              />
-              <Bar
-                dataKey="WithNitro"
-                fill="#795dff"
-                isAnimationActive={false}
-                barSize={36}
-              >
-                <LabelList
-                  dataKey="WithNitro"
-                  content={labelRenderer("with")}
-                />
-              </Bar>
-              <Bar
-                dataKey="WithoutNitro"
-                fill="#626262"
-                isAnimationActive={false}
-                barSize={36}
-              >
-                <LabelList
-                  dataKey="WithoutNitro"
-                  content={labelRenderer("without")}
-                />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+          {text}
+        </text>
       );
     };
-    
-  
-    const root = ReactDOM.createRoot(container);
-    root.render(<Chart />);
-  
-    await new Promise((r) => setTimeout(r, 120));
-    try { window.dispatchEvent(new Event('resize')); } catch {}
-    await new Promise((r) => setTimeout(r, 120));
-  
-    const canvas = await html2canvas(container, {
-      backgroundColor: '#ffffff',
-      scale: 2,
-      useCORS: true,
-      removeContainer: true,
-    });
-    const dataUrl = canvas.toDataURL('image/png');
-  
-    root.unmount();
-    document.body.removeChild(container);
-    return dataUrl;
-  }
-  
+
+    return (
+      <div
+        style={{ width: UI.CHART_W, height: UI.CHART_H, background: "#fff" }}
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={data}
+            margin={{ top: 24, right: 16, left: 8, bottom: 8 }}
+            barCategoryGap={24}
+          >
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="metric" />
+            {/* fixed headroom so labels don’t clip */}
+            <YAxis
+              domain={[0, 111]}
+              allowDecimals={false}
+              tickFormatter={(val) => (val === 111 ? "100" : val)}
+            />
+            <Legend
+              verticalAlign="top"
+              align="center"
+              height={28}
+              formatter={(v) =>
+                v === "WithNitro"
+                  ? "With NitroPack"
+                  : v === "WithoutNitro"
+                  ? "Without NitroPack"
+                  : v
+              }
+            />
+            <Bar
+              dataKey="WithNitro"
+              fill="#795dff"
+              isAnimationActive={false}
+              barSize={36}
+            >
+              <LabelList dataKey="WithNitro" content={labelRenderer("with")} />
+            </Bar>
+            <Bar
+              dataKey="WithoutNitro"
+              fill="#626262"
+              isAnimationActive={false}
+              barSize={36}
+            >
+              <LabelList
+                dataKey="WithoutNitro"
+                content={labelRenderer("without")}
+              />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  };
+
+  const root = ReactDOM.createRoot(container);
+  root.render(<Chart />);
+
+  await new Promise((r) => setTimeout(r, 120));
+  try {
+    window.dispatchEvent(new Event("resize"));
+  } catch {}
+  await new Promise((r) => setTimeout(r, 120));
+
+  await document.fonts.ready;
+
+  const canvas = await html2canvas(container, {
+    backgroundColor: "#ffffff",
+    scale: 2,
+    useCORS: true,
+    removeContainer: true,
+  });
+  const dataUrl = canvas.toDataURL("image/png");
+
+  root.unmount();
+  document.body.removeChild(container);
+  return dataUrl;
+}
 
 async function renderGaugesPNGForStrategy(strategyResults) {
   if (!strategyResults) return null;
 
-  const perfWith = Math.round(
-    (strategyResults?.withNitro?.lighthouseResult?.categories?.performance?.score || 0) * 100
-  ) || 0;
+  const perfWith =
+    Math.round(
+      (strategyResults?.withNitro?.lighthouseResult?.categories?.performance
+        ?.score || 0) * 100
+    ) || 0;
 
-  const perfWithout = Math.round(
-    (strategyResults?.withoutNitro?.lighthouseResult?.categories?.performance?.score || 0) * 100
-  ) || 0;
+  const perfWithout =
+    Math.round(
+      (strategyResults?.withoutNitro?.lighthouseResult?.categories?.performance
+        ?.score || 0) * 100
+    ) || 0;
 
   const diff = perfWith - perfWithout;
   const better = diff >= 0;
@@ -339,16 +362,16 @@ async function renderGaugesPNGForStrategy(strategyResults) {
   const W = UI.GAUGE_SIZE * 2 + UI.GAUGES_CENTER_COL + UI.GAUGES_GAP * 2;
   const H = UI.GAUGE_SIZE + 60;
 
-  const container = document.createElement('div');
+  const container = document.createElement("div");
   Object.assign(container.style, {
-    position: 'fixed',
-    left: '-10000px',
-    top: '0',
+    position: "fixed",
+    left: "-10000px",
+    top: "0",
     width: `${W}px`,
     height: `${H}px`,
-    background: '#fff',
-    pointerEvents: 'none',
-    overflow: 'visible',
+    background: "#fff",
+    pointerEvents: "none",
+    overflow: "visible",
   });
   document.body.appendChild(container);
 
@@ -357,14 +380,14 @@ async function renderGaugesPNGForStrategy(strategyResults) {
       style={{
         width: W,
         height: H,
-        display: 'grid',
+        display: "grid",
         gridTemplateColumns: `1fr ${UI.GAUGES_CENTER_COL}px 1fr`,
-        alignItems: 'center',
+        alignItems: "center",
         gap: UI.GAUGES_GAP,
-        background: '#fff',
+        background: "#fff",
       }}
     >
-      <div style={{ justifySelf: 'center' }}>
+      <div style={{ justifySelf: "center" }}>
         <CircleGauge
           value={perfWith}
           label="With NitroPack"
@@ -378,23 +401,28 @@ async function renderGaugesPNGForStrategy(strategyResults) {
         />
       </div>
 
-      <div style={{ textAlign: 'center', fontFamily: 'Helvetica, Arial, sans-serif' }}>
+      <div
+        style={{
+          textAlign: "center",
+          fontFamily: "Helvetica, Arial, sans-serif",
+        }}
+      >
         <div
           style={{
             fontWeight: 800,
             fontSize: 28,
             lineHeight: 1.1,
-            color: better ? '#10b981' : '#ef4444',
+            color: better ? "#10b981" : "#ef4444",
           }}
         >
           {Math.abs(diff)}%
         </div>
-        <div style={{ color: '#374151', fontSize: 14 }}>
-          {better ? 'Better' : 'Worse'}
+        <div style={{ color: "#374151", fontSize: 14 }}>
+          {better ? "Better" : "Worse"}
         </div>
       </div>
 
-      <div style={{ justifySelf: 'center' }}>
+      <div style={{ justifySelf: "center" }}>
         <CircleGauge
           value={perfWithout}
           label="Without NitroPack"
@@ -414,22 +442,23 @@ async function renderGaugesPNGForStrategy(strategyResults) {
   root.render(<GaugesForPNG />);
 
   await new Promise((r) => setTimeout(r, 120));
-  try { window.dispatchEvent(new Event('resize')); } catch {}
+  try {
+    window.dispatchEvent(new Event("resize"));
+  } catch {}
   await new Promise((r) => setTimeout(r, 120));
 
   const canvas = await html2canvas(container, {
-    backgroundColor: '#ffffff',
+    backgroundColor: "#ffffff",
     scale: 2,
     useCORS: true,
     removeContainer: true,
   });
-  const dataUrl = canvas.toDataURL('image/png');
+  const dataUrl = canvas.toDataURL("image/png");
 
   root.unmount();
   document.body.removeChild(container);
   return dataUrl;
 }
-
 
 export default function SpeedSnapshotForm() {
   const [url, setUrl] = useState(""); //Stores the page URL to be tested.
@@ -453,19 +482,21 @@ export default function SpeedSnapshotForm() {
 
   // Helper function to detect if an error indicates website blocking
   const isBlockingError = (error) => {
-    if (!error || typeof error !== 'string') return false;
-    return error.includes('FAILED_DOCUMENT_REQUEST') ||
-           error.includes('unable to reliably load') ||
-           error.includes('Lighthouse returned error') ||
-           error.includes('HTTP 400') ||
-           error.includes('Both approaches failed') ||
-           error.includes('Website blocking detected');
+    if (!error || typeof error !== "string") return false;
+    return (
+      error.includes("FAILED_DOCUMENT_REQUEST") ||
+      error.includes("unable to reliably load") ||
+      error.includes("Lighthouse returned error") ||
+      error.includes("HTTP 400") ||
+      error.includes("Both approaches failed") ||
+      error.includes("Website blocking detected")
+    );
   };
 
   // Helper function to detect multiple URLs in a single input
   const detectMultipleUrls = (inputText) => {
-    if (!inputText || typeof inputText !== 'string') return [];
-    
+    if (!inputText || typeof inputText !== "string") return [];
+
     // First, decode URL-encoded characters
     let decodedText = inputText;
     try {
@@ -474,38 +505,40 @@ export default function SpeedSnapshotForm() {
       // If decoding fails, use original text
       decodedText = inputText;
     }
-    
+
     // Split by spaces, newlines, commas etc
     const separators = /[\s\n,;]+/;
-    const potentialUrls = decodedText.split(separators).filter(item => item.trim());
-    
+    const potentialUrls = decodedText
+      .split(separators)
+      .filter((item) => item.trim());
+
     const allPotentialUrls = potentialUrls;
-    
-    const validUrls = allPotentialUrls.filter(item => {
+
+    const validUrls = allPotentialUrls.filter((item) => {
       const trimmed = item.trim();
       if (!trimmed) return false;
-      
-      if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+
+      if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
         return true;
       }
-      
+
       // For domains without protocol, must have a proper domain structure
       if (/^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.[a-zA-Z]{2,}/.test(trimmed)) {
         return true;
       }
-      
+
       return false;
     });
-    
+
     // Remove duplicates and empty strings
-    const uniqueUrls = [...new Set(validUrls.filter(url => url.trim()))];
+    const uniqueUrls = [...new Set(validUrls.filter((url) => url.trim()))];
 
     // Debug logging
-    console.log('[URL-DETECTION] Input:', inputText);
-    console.log('[URL-DETECTION] Decoded:', decodedText);
-    console.log('[URL-DETECTION] Potential URLs:', potentialUrls);
-    console.log('[URL-DETECTION] Valid URLs:', validUrls);
-    console.log('[URL-DETECTION] Unique URLs:', uniqueUrls);
+    console.log("[URL-DETECTION] Input:", inputText);
+    console.log("[URL-DETECTION] Decoded:", decodedText);
+    console.log("[URL-DETECTION] Potential URLs:", potentialUrls);
+    console.log("[URL-DETECTION] Valid URLs:", validUrls);
+    console.log("[URL-DETECTION] Unique URLs:", uniqueUrls);
 
     // Only return if we have more than 1 valid URL
     return uniqueUrls.length > 1 ? uniqueUrls : [];
@@ -584,17 +617,17 @@ export default function SpeedSnapshotForm() {
     const rawWith = safeNum(withReport, m.id);
     const rawWithout = safeNum(withoutReport, m.id);
     if (Number.isNaN(rawWith) || Number.isNaN(rawWithout)) return null;
-  
+
     const withVal = m.convert(rawWith);
     const withoutVal = m.convert(rawWithout);
     const delta = withVal - withoutVal;
     const abs = Math.abs(delta);
-  
-    let deltaText = '';
-    let className = '';
-    let deltaLabel = '';
-    let deltaValue = '';
-  
+
+    let deltaText = "";
+    let className = "";
+    let deltaLabel = "";
+    let deltaValue = "";
+
     if (abs > m.tolerance) {
       if (delta < 0) {
         deltaLabel = "Improved by";
@@ -608,7 +641,7 @@ export default function SpeedSnapshotForm() {
         className = "delta delta-bad";
       }
     }
-  
+
     return {
       withVal,
       withoutVal,
@@ -619,7 +652,7 @@ export default function SpeedSnapshotForm() {
       deltaLabel,
       deltaValue,
     };
-  };//When the UI renders the metrics table, it takes formatWith, formatWithout, deltaText, and className from here and displays them.
+  }; //When the UI renders the metrics table, it takes formatWith, formatWithout, deltaText, and className from here and displays them.
 
   const buildChartData = (strategyResults) => {
     if (!strategyResults) return [];
@@ -661,125 +694,178 @@ export default function SpeedSnapshotForm() {
     ];
   }; //Turn one device’s results into the array shape charts expects to draw the bars.
 
-
   // Visible, PDF bar charts
-const CAPS = { 'FCP (s)': 3.0, 'LCP (s)': 4.0, 'TBT (ms)': 400, 'CLS': 0.30, 'Perf. Score': 100 };
+  const CAPS = {
+    "FCP (s)": 3.0,
+    "LCP (s)": 4.0,
+    "TBT (ms)": 400,
+    CLS: 0.3,
+    "Perf. Score": 100,
+  };
 
-const THRESH = {
-  'FCP (s)': { good: 1.8, ni: 3.0 },
-  'LCP (s)': { good: 2.5, ni: 4.0 },
-  'TBT (ms)': { good: 200, ni: 600 },
-  'CLS':     { good: 0.10, ni: 0.25 },
-  'Perf. Score': { good: 90, ni: 50 },
-};
+  const THRESH = {
+    "FCP (s)": { good: 1.8, ni: 3.0 },
+    "LCP (s)": { good: 2.5, ni: 4.0 },
+    "TBT (ms)": { good: 200, ni: 600 },
+    CLS: { good: 0.1, ni: 0.25 },
+    "Perf. Score": { good: 90, ni: 50 },
+  };
 
-const COLORS = { good: '#10b981', ni: '#f59e0b', poor: '#ef4444' };
+  const COLORS = { good: "#10b981", ni: "#f59e0b", poor: "#ef4444" };
 
-function metricQuality(metric, v) {
-  const t = THRESH[metric];
-  const n = Number(v);
-  if (!t || !Number.isFinite(n)) return 'ni';
-  if (metric === 'Perf. Score') return n >= t.good ? 'good' : n >= t.ni ? 'ni' : 'poor';
-  return n <= t.good ? 'good' : n <= t.ni ? 'ni' : 'poor';
-}
+  function metricQuality(metric, v) {
+    const t = THRESH[metric];
+    const n = Number(v);
+    if (!t || !Number.isFinite(n)) return "ni";
+    if (metric === "Perf. Score")
+      return n >= t.good ? "good" : n >= t.ni ? "ni" : "poor";
+    return n <= t.good ? "good" : n <= t.ni ? "ni" : "poor";
+  }
 
-function fmtChartValue(metric, v) {
-  const n = Number(v);
-  if (!Number.isFinite(n)) return '—';
-  if (metric === 'CLS') return n.toFixed(2);
-  if (metric.includes('(ms)')) return `${Math.round(n)} ms`;
-  if (metric.includes('(s)'))  return `${n.toFixed(2)} s`;
-  if (metric.includes('Score')) return `${Math.round(n)}`;
-  return String(n);
-}
+  function fmtChartValue(metric, v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "—";
+    if (metric === "CLS") return n.toFixed(2);
+    if (metric.includes("(ms)")) return `${Math.round(n)} ms`;
+    if (metric.includes("(s)")) return `${n.toFixed(2)} s`;
+    if (metric.includes("Score")) return `${Math.round(n)}`;
+    return String(n);
+  }
 
+  function normalizeForChart(metric, v) {
+    const cap = CAPS[metric] ?? 100;
+    const n = Number(v);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.min(100, (n / cap) * 100));
+  }
 
-function normalizeForChart(metric, v) {
-  const cap = CAPS[metric] ?? 100;
-  const n = Number(v);
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.min(100, (n / cap) * 100));
-}
+  // Turn the existing buildChartData into a display dataset
+  function rowCap(metric, withRaw, withoutRaw) {
+    if (metric === "Perf. Score") return 100;
 
-// Turn the existing buildChartData into a display dataset
-function rowCap(metric, withRaw, withoutRaw) {
-  if (metric === 'Perf. Score') return 100;
+    const base = CAPS[metric] ?? 100;
+    const maxRaw = Math.max(Number(withRaw) || 0, Number(withoutRaw) || 0);
+    return Math.max(base, maxRaw * 1.1); // +10% headroom
+  }
 
-  const base = CAPS[metric] ?? 100;
-  const maxRaw = Math.max(Number(withRaw) || 0, Number(withoutRaw) || 0);
-  return Math.max(base, maxRaw * 1.10);// +10% headroom
-}
+  function makeVisibleChartData(strategyResults) {
+    const raw = buildChartData(strategyResults);
 
-function makeVisibleChartData(strategyResults) {
-  const raw = buildChartData(strategyResults);
-  
+    return raw.map((r) => {
+      const cap = rowCap(r.metric, r.WithNitro, r.WithoutNitro);
 
-  return raw.map(r => {
-    const cap = rowCap(r.metric, r.WithNitro, r.WithoutNitro);
+      const withN = Math.max(
+        0,
+        Math.min(100, (Number(r.WithNitro) / cap) * 100)
+      );
+      const withoutN = Math.max(
+        0,
+        Math.min(100, (Number(r.WithoutNitro) / cap) * 100)
+      );
 
-    const withN = Math.max(0, Math.min(100, (Number(r.WithNitro)   / cap) * 100));
-    const withoutN = Math.max(0, Math.min(100, (Number(r.WithoutNitro) / cap) * 100));
+      //  zero values will still show a minimum visible bar (2%)
+      const minVisibleHeight = 2;
+      const finalWithN = withN === 0 ? minVisibleHeight : withN;
+      const finalWithoutN = withoutN === 0 ? minVisibleHeight : withoutN;
 
-    //  zero values will still show a minimum visible bar (2%)
-    const minVisibleHeight = 2;
-    const finalWithN = withN === 0 ? minVisibleHeight : withN;
-    const finalWithoutN = withoutN === 0 ? minVisibleHeight : withoutN;
+      return {
+        metric: r.metric,
+        WithNitro: finalWithN,
+        WithoutNitro: finalWithoutN,
+        _withRaw: Number(r.WithNitro),
+        _withoutRaw: Number(r.WithoutNitro),
+      };
+    });
+  }
 
-    return {
-      metric: r.metric,
-      WithNitro: finalWithN,
-      WithoutNitro: finalWithoutN,
-      _withRaw: Number(r.WithNitro),
-      _withoutRaw: Number(r.WithoutNitro),
+  // Reusable visible chart
+  function VisualComparisonChart({ data }) {
+    const labelRenderer = (series) => (props) => {
+      const { x, y, width, index } = props;
+      const row = data[index];
+      const metric = row?.metric || "";
+      const rawVal = series === "with" ? row._withRaw : row._withoutRaw;
+      const color = COLORS[metricQuality(metric, rawVal)];
+      const text = fmtChartValue(metric, rawVal);
+      return (
+        <text
+          x={x + width / 2}
+          y={y - 6}
+          textAnchor="middle"
+          fontSize={12}
+          fontWeight={700}
+          fill={color}
+        >
+          {text}
+        </text>
+      );
     };
-  });
-}
 
+    const tooltipFormatter = (value, name, ctx) => {
+      const m = ctx?.payload?.metric || "";
+      const raw =
+        name === "WithNitro"
+          ? ctx?.payload?._withRaw
+          : ctx?.payload?._withoutRaw;
+      return [
+        fmtChartValue(m, raw),
+        name === "WithNitro" ? "With NitroPack" : "Without NitroPack",
+      ];
+    };
 
-// Reusable visible chart
-function VisualComparisonChart({ data }) {
-  const labelRenderer = (series) => (props) => {
-    const { x, y, width, index } = props;
-    const row = data[index];
-    const metric = row?.metric || '';
-    const rawVal = series === 'with' ? row._withRaw : row._withoutRaw;
-    const color  = COLORS[metricQuality(metric, rawVal)];
-    const text   = fmtChartValue(metric, rawVal);
     return (
-      <text x={x + width / 2} y={y - 6} textAnchor="middle" fontSize={12} fontWeight={700} fill={color}>
-        {text}
-      </text>
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart
+          data={data}
+          margin={{ top: 24, right: 16, left: 8, bottom: 8 }}
+          barCategoryGap={24}
+        >
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="metric" />
+          <YAxis
+            domain={[0, 111]}
+            allowDecimals={false}
+            tickFormatter={(val) => (val === 111 ? "100" : val)}
+          />
+          <Tooltip
+            formatter={tooltipFormatter}
+            labelFormatter={(label) => label}
+          />
+          <Legend
+            verticalAlign="top"
+            align="center"
+            height={28}
+            formatter={(v) =>
+              v === "WithNitro"
+                ? "With NitroPack"
+                : v === "WithoutNitro"
+                ? "Without NitroPack"
+                : v
+            }
+          />
+          <Bar
+            dataKey="WithNitro"
+            fill="#795dff"
+            isAnimationActive={false}
+            barSize={36}
+          >
+            <LabelList dataKey="WithNitro" content={labelRenderer("with")} />
+          </Bar>
+          <Bar
+            dataKey="WithoutNitro"
+            fill="#626262"
+            isAnimationActive={false}
+            barSize={36}
+          >
+            <LabelList
+              dataKey="WithoutNitro"
+              content={labelRenderer("without")}
+            />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
     );
-  };
-  
-
-  const tooltipFormatter = (value, name, ctx) => {
-    const m = ctx?.payload?.metric || '';
-    const raw = name === 'WithNitro' ? ctx?.payload?._withRaw : ctx?.payload?._withoutRaw;
-    return [fmtChartValue(m, raw), name === 'WithNitro' ? 'With NitroPack' : 'Without NitroPack'];
-  };
-
-  return (
-    <ResponsiveContainer width="100%" height={300}>
-      <BarChart data={data} margin={{ top: 24, right: 16, left: 8, bottom: 8 }} barCategoryGap={24}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="metric" />
-        <YAxis domain={[0, 111]} allowDecimals={false} tickFormatter={(val) => (val === 111 ? '100' : val)}/>
-        <Tooltip formatter={tooltipFormatter} labelFormatter={(label) => label} />
-        <Legend verticalAlign="top" align="center" height={28}
-          formatter={(v) => (v === 'WithNitro' ? 'With NitroPack' : v === 'WithoutNitro' ? 'Without NitroPack' : v)}
-        />
-        <Bar dataKey="WithNitro" fill="#795dff" isAnimationActive={false} barSize={36}>
-          <LabelList dataKey="WithNitro" content={labelRenderer('with')} />
-        </Bar>
-        <Bar dataKey="WithoutNitro" fill="#626262" isAnimationActive={false} barSize={36}>
-          <LabelList dataKey="WithoutNitro" content={labelRenderer('without')} />
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
-
+  }
 
   const stubFromSummary = (row, which) => {
     const suffix = which === "with" ? "with" : "without";
@@ -1005,7 +1091,13 @@ function VisualComparisonChart({ data }) {
     return res.json().catch(() => ({}));
   }
 
-  const runOneUrl = async (theUrl, stratList, groupId, caseId, skipSave = false) => {
+  const runOneUrl = async (
+    theUrl,
+    stratList,
+    groupId,
+    caseId,
+    skipSave = false
+  ) => {
     const optimizedURL = theUrl.trim();
     const unoptimizedURL = optimizedURL.includes("?")
       ? `${optimizedURL}&nonitro`
@@ -1037,18 +1129,21 @@ function VisualComparisonChart({ data }) {
         // Only save if not in retry mode or if we have valid PSI data
         if (!skipSave && (withNitro || withoutNitro)) {
           try {
-        const row = extractSummary(
-          optimizedURL,
-          strat,
-          withNitro,
-          withoutNitro,
-          groupId,
-          null,
-          caseId
-        );
-        await saveReport(row);
+            const row = extractSummary(
+              optimizedURL,
+              strat,
+              withNitro,
+              withoutNitro,
+              groupId,
+              null,
+              caseId
+            );
+            await saveReport(row);
           } catch (saveError) {
-            console.warn(`[PSI] Save failed for ${optimizedURL} (${strat}):`, saveError);
+            console.warn(
+              `[PSI] Save failed for ${optimizedURL} (${strat}):`,
+              saveError
+            );
             // Continue processing even if save fails
           }
         }
@@ -1085,52 +1180,53 @@ function VisualComparisonChart({ data }) {
 
       if (!bulkMode) {
         const detectedUrls = detectMultipleUrls(url);
-        
+
         if (detectedUrls.length > 1) {
-          console.log(`[AUTO-BULK] Detected ${detectedUrls.length} URLs, switching to bulk mode`);
-          
-          const urlsToUse = detectedUrls.slice(0, 6);//allow max 6 URLs
+          console.log(
+            `[AUTO-BULK] Detected ${detectedUrls.length} URLs, switching to bulk mode`
+          );
+
+          const urlsToUse = detectedUrls.slice(0, 6); //allow max 6 URLs
           const newBulkUrls = [...urlsToUse];
-          
+
           while (newBulkUrls.length < 6) {
-            newBulkUrls.push('');
+            newBulkUrls.push("");
           }
-          
+
           setBulkUrls(newBulkUrls);
           setBulkMode(true);
           setAutoBulkDetected(true);
-          
         } else {
-        const normalizedUrl = normalizeUrl(url);
-        if (!normalizedUrl) {
-          setLoading(false);
-          alert(
-            'Please enter a valid site, e.g. "example.com" or "https://example.com".'
+          const normalizedUrl = normalizeUrl(url);
+          if (!normalizedUrl) {
+            setLoading(false);
+            alert(
+              'Please enter a valid site, e.g. "example.com" or "https://example.com".'
+            );
+            return;
+          }
+          const groupId = `${Date.now()}`;
+          const { results: singleRes, debug } = await runOneUrl(
+            normalizedUrl,
+            strategies,
+            groupId,
+            caseId
           );
-          return;
-        }
-        const groupId = `${Date.now()}`;
-        const { results: singleRes, debug } = await runOneUrl(
-          normalizedUrl,
-          strategies,
-          groupId,
-          caseId
-        );
 
-        setResults(singleRes);
-        setDebugInfo(debug);
-        setSelectedDevice(strategies[0]);
-        setTimeout(
-          () =>
-            resultsRef.current?.scrollIntoView({
-              behavior: "smooth",
-              block: "start",
-            }),
-          60
-        );
+          setResults(singleRes);
+          setDebugInfo(debug);
+          setSelectedDevice(strategies[0]);
+          setTimeout(
+            () =>
+              resultsRef.current?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              }),
+            60
+          );
         }
       }
-      
+
       // Handle bulk mode
       if (bulkMode) {
         const inputsRaw = bulkUrls.map((s) => s.trim()).filter(Boolean);
@@ -1142,27 +1238,26 @@ function VisualComparisonChart({ data }) {
           return;
         }
 
-
         const groupBase = Date.now();
         const pageMap = {};
 
         // Run pages with early failure detection - switch to safe mode when first failure detected
         let safeModeTriggered = false;
         const safeModePages = [];
-        
+
         const promises = inputs.map(async (pageUrl, i) => {
           // Delay the start of each page by 2 seconds to avoid rate limits
-          await new Promise(resolve => setTimeout(resolve, i * 2000));
-          
+          await new Promise((resolve) => setTimeout(resolve, i * 2000));
+
           // If safe mode was already triggered, skip this page for now
           if (safeModeTriggered) {
             safeModePages.push(pageUrl);
             return { pageUrl, results: null, debug: null, skipped: true };
           }
-          
+
           const groupId = `${groupBase}-${i + 1}`;
-            const pageCaseId = `${caseId}-${i + 1}`;
-        
+          const pageCaseId = `${caseId}-${i + 1}`;
+
           try {
             const { results: r, debug } = await runOneUrl(
               pageUrl,
@@ -1170,31 +1265,42 @@ function VisualComparisonChart({ data }) {
               groupId,
               pageCaseId
             );
-            
+
             // Check if this page failed (no PSI data)
-            const hasMobile = r.mobile && r.mobile.withNitro && r.mobile.withoutNitro;
-            const hasDesktop = r.desktop && r.desktop.withNitro && r.desktop.withoutNitro;
-            
+            const hasMobile =
+              r.mobile && r.mobile.withNitro && r.mobile.withoutNitro;
+            const hasDesktop =
+              r.desktop && r.desktop.withNitro && r.desktop.withoutNitro;
+
             if (!hasMobile && !hasDesktop) {
               // First failure detected - trigger safe mode for remaining pages
               if (!safeModeTriggered) {
-                console.log(`[BULK] First failure detected at ${pageUrl} - switching to safe mode for remaining pages...`);
+                console.log(
+                  `[BULK] First failure detected at ${pageUrl} - switching to safe mode for remaining pages...`
+                );
                 safeModeTriggered = true;
               }
             }
-        
+
             r.pageUrl = pageUrl;
-            return { pageUrl, results: r, debug, success: hasMobile || hasDesktop };
+            return {
+              pageUrl,
+              results: r,
+              debug,
+              success: hasMobile || hasDesktop,
+            };
           } catch (error) {
             console.error(`[BULK] Error processing ${pageUrl}:`, error);
             if (!safeModeTriggered) {
-              console.log(`[BULK] Error detected at ${pageUrl} - switching to safe mode for remaining pages...`);
+              console.log(
+                `[BULK] Error detected at ${pageUrl} - switching to safe mode for remaining pages...`
+              );
               safeModeTriggered = true;
             }
             return { pageUrl, results: null, debug: null, success: false };
           }
         });
-        
+
         const results = await Promise.all(promises);
         results.forEach(({ pageUrl, results: r, debug, skipped }) => {
           if (!skipped && r) {
@@ -1204,21 +1310,29 @@ function VisualComparisonChart({ data }) {
 
         // Process pages that were skipped due to early failure detection
         if (safeModePages.length > 0) {
-          console.log(`[BULK] Processing ${safeModePages.length} pages in smart mode (one by one)...`);
-          
+          console.log(
+            `[BULK] Processing ${safeModePages.length} pages in smart mode (one by one)...`
+          );
+
           for (let i = 0; i < safeModePages.length; i++) {
             const pageUrl = safeModePages[i];
-            console.log(`[BULK] Processing ${pageUrl} in smart mode (${i + 1}/${safeModePages.length})...`);
-            
+            console.log(
+              `[BULK] Processing ${pageUrl} in smart mode (${i + 1}/${
+                safeModePages.length
+              })...`
+            );
+
             // Wait longer between each page
             if (i > 0) {
-              await new Promise(resolve => setTimeout(resolve, 20000 + (i * 10000)));
+              await new Promise((resolve) =>
+                setTimeout(resolve, 20000 + i * 10000)
+              );
             }
-            
+
             try {
               const groupId = `${groupBase}-${inputs.indexOf(pageUrl) + 1}`;
               const pageCaseId = `${caseId}-${inputs.indexOf(pageUrl) + 1}`;
-              
+
               const { results: r, debug } = await runOneUrl(
                 pageUrl,
                 strategies,
@@ -1226,16 +1340,20 @@ function VisualComparisonChart({ data }) {
                 pageCaseId,
                 true // Skip save on retry to avoid duplicate saves
               );
-              
+
               r.pageUrl = pageUrl;
               pageMap[pageUrl] = { ...r, debug };
-              
-              const hasMobile = r.mobile && r.mobile.withNitro && r.mobile.withoutNitro;
-              const hasDesktop = r.desktop && r.desktop.withNitro && r.desktop.withoutNitro;
+
+              const hasMobile =
+                r.mobile && r.mobile.withNitro && r.mobile.withoutNitro;
+              const hasDesktop =
+                r.desktop && r.desktop.withNitro && r.desktop.withoutNitro;
               if (hasMobile || hasDesktop) {
                 console.log(`[BULK] Smart mode succeeded for ${pageUrl}`);
               } else {
-                console.log(`[BULK] Smart mode failed for ${pageUrl} - likely website blocking`);
+                console.log(
+                  `[BULK] Smart mode failed for ${pageUrl} - likely website blocking`
+                );
               }
             } catch (error) {
               console.error(`[BULK] Smart mode failed for ${pageUrl}:`, error);
@@ -1246,20 +1364,27 @@ function VisualComparisonChart({ data }) {
         const failedPages = results.filter(({ results: r, skipped }) => {
           if (skipped) return false; // Skip pages that were already processed in safe mode
           if (!r) return true; // Pages that had errors
-          
+
           // Check if both mobile and desktop failed (no PSI data)
-          const hasMobile = r.mobile && r.mobile.withNitro && r.mobile.withoutNitro;
-          const hasDesktop = r.desktop && r.desktop.withNitro && r.desktop.withoutNitro;
+          const hasMobile =
+            r.mobile && r.mobile.withNitro && r.mobile.withoutNitro;
+          const hasDesktop =
+            r.desktop && r.desktop.withNitro && r.desktop.withoutNitro;
           return !hasMobile && !hasDesktop;
         });
 
         if (failedPages.length > 0) {
-          console.log(`[BULK] ${failedPages.length} additional pages failed - likely website blocking, skipping retries...`);
-          
+          console.log(
+            `[BULK] ${failedPages.length} additional pages failed - likely website blocking, skipping retries...`
+          );
+
           // Skip retry pages that failed due to website blocking
-          const skippedPages = failedPages.map(p => p.pageUrl);
-          console.log(`[BULK] Skipping ${skippedPages.length} pages due to website blocking:`, skippedPages);
-          
+          const skippedPages = failedPages.map((p) => p.pageUrl);
+          console.log(
+            `[BULK] Skipping ${skippedPages.length} pages due to website blocking:`,
+            skippedPages
+          );
+
           // Add failed pages to the map with error info
           failedPages.forEach(({ pageUrl }) => {
             pageMap[pageUrl] = {
@@ -1268,7 +1393,7 @@ function VisualComparisonChart({ data }) {
               submittedAt: new Date(),
               reportName: `${caseId}-${inputs.indexOf(pageUrl) + 1}`,
               pageUrl,
-              error: 'Website blocking detected - PSI cannot access this URL'
+              error: "Website blocking detected - PSI cannot access this URL",
             };
           });
         }
@@ -1302,32 +1427,45 @@ function VisualComparisonChart({ data }) {
 
   // PDF Export
 
-
   //Format the time Zone
   function formatSofiaTimestamp(ts) {
-    const TZ = 'Europe/Sofia';
+    const TZ = "Europe/Sofia";
     const d = new Date(ts);
 
-    const dateStr = new Intl.DateTimeFormat('en-GB', {
+    const dateStr = new Intl.DateTimeFormat("en-GB", {
       timeZone: TZ,
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
-      hour12: false
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
     }).format(d);
 
-    const tzAbbr = new Intl.DateTimeFormat('en-GB', {
-      timeZone: TZ, timeZoneName: 'short'
-    }).formatToParts(d).find(p => p.type === 'timeZoneName')?.value || 'EET';
+    const tzAbbr =
+      new Intl.DateTimeFormat("en-GB", {
+        timeZone: TZ,
+        timeZoneName: "short",
+      })
+        .formatToParts(d)
+        .find((p) => p.type === "timeZoneName")?.value || "EET";
 
-    let tzOffset = '';
+    let tzOffset = "";
     try {
-      tzOffset = new Intl.DateTimeFormat('en', {
-        timeZone: TZ, timeZoneName: 'shortOffset'
-      }).formatToParts(d).find(p => p.type === 'timeZoneName')
-        ?.value.replace('GMT', 'UTC') || '';
-    } catch { /* older browsers: no numeric offset */ }
+      tzOffset =
+        new Intl.DateTimeFormat("en", {
+          timeZone: TZ,
+          timeZoneName: "shortOffset",
+        })
+          .formatToParts(d)
+          .find((p) => p.type === "timeZoneName")
+          ?.value.replace("GMT", "UTC") || "";
+    } catch {
+      /* older browsers: no numeric offset */
+    }
 
-    return `${dateStr} ${tzAbbr}${tzOffset ? ` (${tzOffset})` : ''}`;
+    return `${dateStr} ${tzAbbr}${tzOffset ? ` (${tzOffset})` : ""}`;
   }
 
   const exportResultsPDF = async (opts = {}) => {
@@ -1398,38 +1536,55 @@ function VisualComparisonChart({ data }) {
         doc.text(`URL: ${urlShown}`, marginX, y);
       }
       doc.setTextColor(0, 0, 0);
-      const generatedLine = formatSofiaTimestamp(current.submittedAt || Date.now());
+      const generatedLine = formatSofiaTimestamp(
+        current.submittedAt || Date.now()
+      );
       doc.text(`Generated: ${generatedLine}`, marginX, y + lineH);
       y += lineH + 24; // space before gauges
 
       //Timezone-aware line (Europe/Sofia)
-const TZ = 'Europe/Sofia';
-const d  = new Date(current.submittedAt || Date.now());
+      const TZ = "Europe/Sofia";
+      const d = new Date(current.submittedAt || Date.now());
 
-// Date/time in Sofia
-const dateStr = new Intl.DateTimeFormat('en-GB', {
-  timeZone: TZ,
-  year: 'numeric', month: '2-digit', day: '2-digit',
-  hour: '2-digit', minute: '2-digit', second: '2-digit',
-  hour12: false
-}).format(d);
+      // Date/time in Sofia
+      const dateStr = new Intl.DateTimeFormat("en-GB", {
+        timeZone: TZ,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      }).format(d);
 
-//EET / EEST
-const tzAbbr = new Intl.DateTimeFormat('en-GB', {
-  timeZone: TZ, timeZoneName: 'short'
-}).formatToParts(d).find(p => p.type === 'timeZoneName')?.value || 'EET';
+      //EET / EEST
+      const tzAbbr =
+        new Intl.DateTimeFormat("en-GB", {
+          timeZone: TZ,
+          timeZoneName: "short",
+        })
+          .formatToParts(d)
+          .find((p) => p.type === "timeZoneName")?.value || "EET";
 
-//UTC+2 / UTC+3 (fallback-safe)
-let tzOffset = '';
-try {
-  tzOffset = new Intl.DateTimeFormat('en', {
-    timeZone: TZ, timeZoneName: 'shortOffset'
-  }).formatToParts(d).find(p => p.type === 'timeZoneName')?.value.replace('GMT','UTC') || '';
-} catch {
+      //UTC+2 / UTC+3 (fallback-safe)
+      let tzOffset = "";
+      try {
+        tzOffset =
+          new Intl.DateTimeFormat("en", {
+            timeZone: TZ,
+            timeZoneName: "shortOffset",
+          })
+            .formatToParts(d)
+            .find((p) => p.type === "timeZoneName")
+            ?.value.replace("GMT", "UTC") || "";
+      } catch {}
 
-}
-
-doc.text(`Generated: ${dateStr} ${tzAbbr}${tzOffset ? ` (${tzOffset})` : ''}`, marginX, y + lineH);
+      doc.text(
+        `Generated: ${dateStr} ${tzAbbr}${tzOffset ? ` (${tzOffset})` : ""}`,
+        marginX,
+        y + lineH
+      );
 
       //GAUGES
       try {
@@ -1691,10 +1846,7 @@ doc.text(`Generated: ${dateStr} ${tzAbbr}${tzOffset ? ` (${tzOffset})` : ''}`, m
     doc.save(filename);
   };
 
-  const psiUiUrl = (
-    u,
-    strat
-  ) =>
+  const psiUiUrl = (u, strat) =>
     `https://pagespeed.web.dev/analysis?url=${encodeURIComponent(
       u
     )}&hl=en&form_factor=${strat}`;
@@ -1809,8 +1961,6 @@ doc.text(`Generated: ${dateStr} ${tzAbbr}${tzOffset ? ` (${tzOffset})` : ''}`, m
     const withFull = perfWith >= 99.5;
     const withoutFull = perfWithout >= 99.5;
 
-
-
     return (
       <div className="results">
         <h2>
@@ -1862,59 +2012,68 @@ doc.text(`Generated: ${dateStr} ${tzAbbr}${tzOffset ? ` (${tzOffset})` : ''}`, m
               {withErr && (
                 <>
                   • With NitroPack failed.{" "}
-                    <a
-                      href={psiUiUrl(
+                  <a
+                    href={psiUiUrl(
                       strategyDebug?.requested?.withNitro || pageUrl,
-                        strategy
-                      )}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        fontWeight: 700,
-                        color: "#b91c1c",
-                        textDecoration: "underline",
-                      }}
-                    >
-                      Open PSI
-                    </a>
+                      strategy
+                    )}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      fontWeight: 700,
+                      color: "#b91c1c",
+                      textDecoration: "underline",
+                    }}
+                  >
+                    Open PSI
+                  </a>
                   <br />
                 </>
               )}
               {withoutErr && (
                 <>
                   • Without NitroPack failed.{" "}
-                    <a
-                      href={psiUiUrl(
-                      strategyDebug?.requested?.withoutNitro || (pageUrl + (pageUrl.includes('?') ? '&' : '?') + 'nonitro'),
-                        strategy
-                      )}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        fontWeight: 700,
-                        color: "#b91c1c",
-                        textDecoration: "underline",
-                      }}
-                    >
-                      Open PSI
-                    </a>
+                  <a
+                    href={psiUiUrl(
+                      strategyDebug?.requested?.withoutNitro ||
+                        pageUrl +
+                          (pageUrl.includes("?") ? "&" : "?") +
+                          "nonitro",
+                      strategy
+                    )}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      fontWeight: 700,
+                      color: "#b91c1c",
+                      textDecoration: "underline",
+                    }}
+                  >
+                    Open PSI
+                  </a>
                 </>
               )}
             </div>
             {/* Show blocking explanation if this looks like a security block */}
             {(isBlockingError(withErr) || isBlockingError(withoutErr)) && (
-              <div style={{ 
-                marginTop: 12, 
-                padding: 12, 
-                backgroundColor: '#fef3c7', 
-                border: '1px solid #f59e0b', 
-                borderRadius: 8,
-                fontSize: 14
-              }}>
-                <strong>🔒 Website Security Block Detected</strong><br />
-                This website appears to be blocking automated requests from PageSpeed Insights. 
-                This is common with sites using Cloudflare or similar security systems.<br />
-                <strong>Solution:</strong> Try testing this URL directly in the official PSI tool using the links above.
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: 12,
+                  backgroundColor: "#fef3c7",
+                  border: "1px solid #f59e0b",
+                  borderRadius: 8,
+                  fontSize: 14,
+                }}
+              >
+                <strong>🔒 Website Security Block Detected</strong>
+                <br />
+                This website appears to be blocking automated requests from
+                PageSpeed Insights. This is common with sites using Cloudflare
+                or similar security systems.
+                <br />
+                <strong>Solution:</strong> Try testing this URL directly in the
+                official PSI tool using the links above.
               </div>
             )}
           </div>
@@ -1934,13 +2093,17 @@ doc.text(`Generated: ${dateStr} ${tzAbbr}${tzOffset ? ` (${tzOffset})` : ''}`, m
             />
           </div>
 
-          <div
-            className={`gauge-delta ${
-              better ? "gauge-delta--good" : "gauge-delta--bad"
-            }`}
-          >
-            <div className="delta-num">{Math.abs(diff)}%</div>
-            <div className="delta-caption">{better ? "Better" : "Worse"}</div>
+          <div className="text-center font-bold">
+            <div
+              className={`text-[20px] ${
+                better ? "text-success" : "text-danger"
+              }`}
+            >
+              {Math.abs(diff)}%
+            </div>
+            <div className="text-[14px] text-[var(--text)]">
+              {better ? "Better" : "Worse"}
+            </div>
           </div>
 
           <div style={{ justifySelf: "center" }}>
@@ -2166,16 +2329,19 @@ doc.text(`Generated: ${dateStr} ${tzAbbr}${tzOffset ? ` (${tzOffset})` : ''}`, m
 
         {/* Show auto-bulk detection message */}
         {autoBulkDetected && (
-          <div style={{
-            margin: '8px 0',
-            padding: '8px 12px',
-            backgroundColor: '#e0f2fe',
-            border: '1px solid #0288d1',
-            borderRadius: '6px',
-            fontSize: '14px',
-            color: '#01579b'
-          }}>
-            🔄 <strong>Auto-detected multiple URLs</strong> - Automatically switched to bulk mode
+          <div
+            style={{
+              margin: "8px 0",
+              padding: "8px 12px",
+              backgroundColor: "#e0f2fe",
+              border: "1px solid #0288d1",
+              borderRadius: "6px",
+              fontSize: "14px",
+              color: "#01579b",
+            }}
+          >
+            🔄 <strong>Auto-detected multiple URLs</strong> - Automatically
+            switched to bulk mode
           </div>
         )}
 
@@ -2201,13 +2367,16 @@ doc.text(`Generated: ${dateStr} ${tzAbbr}${tzOffset ? ` (${tzOffset})` : ''}`, m
           />
         </div>
 
-        <button type="w-full px-4 py-[14px] rounded-[12px] font-extrabold tracking-[0.02em]
+        <button
+          type="w-full px-4 py-[14px] rounded-[12px] font-extrabold tracking-[0.02em]
             border border-[rgba(5,63,53,0.08)] bg-[var(--accent)] text-[var(--accent-ink)]
             shadow-[0_10px_18px_rgba(184,255,242,0.35)]
             transition-[transform_.04s_ease,box-shadow_.2s_ease,background-color_.15s_ease,filter_.2s_ease]
             hover:bg-[var(--accent-hover)] hover:-translate-y-px hover:shadow-[0_14px_24px_rgba(184,255,242,0.42)]
             active:translate-y-0 active:saturate-[0.98] disabled:opacity-65 disabled:cursor-default
-            disabled:translate-y-0 disabled:shadow-none" disabled={loading}>
+            disabled:translate-y-0 disabled:shadow-none"
+          disabled={loading}
+        >
           {loading ? "Running PSI…" : "Generate Snapshot"}
         </button>
       </form>
@@ -2219,7 +2388,6 @@ doc.text(`Generated: ${dateStr} ${tzAbbr}${tzOffset ? ` (${tzOffset})` : ''}`, m
           </button>
         </div>
       )}
-
       {resultsBulk && renderPageToggle()}
 
       <div ref={resultsRef} />
@@ -2237,33 +2405,39 @@ doc.text(`Generated: ${dateStr} ${tzAbbr}${tzOffset ? ` (${tzOffset})` : ''}`, m
         <>
           {/* Show bulk summary if there are blocked URLs */}
           {(() => {
-            const blockedCount = Object.values(resultsBulk).filter(result => 
-              result?.error?.includes('Website blocking detected')
+            const blockedCount = Object.values(resultsBulk).filter((result) =>
+              result?.error?.includes("Website blocking detected")
             ).length;
             const totalCount = Object.keys(resultsBulk).length;
-            
+
             if (blockedCount > 0) {
               return (
-                <div style={{ 
-                  margin: '12px 0', 
-                  padding: 12, 
-                  backgroundColor: '#fef3c7', 
-                  border: '1px solid #f59e0b', 
-                  borderRadius: 8,
-                  fontSize: 14
-                }}>
-                  <strong>📊 Bulk Test Summary</strong><br />
-                  {blockedCount} out of {totalCount} URLs were blocked by website security systems.<br />
-                  <strong>Tip:</strong> Try testing blocked URLs directly in the official PSI tool for better results.
+                <div
+                  style={{
+                    margin: "12px 0",
+                    padding: 12,
+                    backgroundColor: "#fef3c7",
+                    border: "1px solid #f59e0b",
+                    borderRadius: 8,
+                    fontSize: 14,
+                  }}
+                >
+                  <strong>📊 Bulk Test Summary</strong>
+                  <br />
+                  {blockedCount} out of {totalCount} URLs were blocked by
+                  website security systems.
+                  <br />
+                  <strong>Tip:</strong> Try testing blocked URLs directly in the
+                  official PSI tool for better results.
                 </div>
               );
             }
             return null;
           })()}
-        <ResultPanel
-          data={resultsBulk[activePageKey]}
-          pageUrl={activePageKey}
-        />
+          <ResultPanel
+            data={resultsBulk[activePageKey]}
+            pageUrl={activePageKey}
+          />
         </>
       )}
     </div>
