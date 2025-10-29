@@ -44,11 +44,4 @@ if ($case) {
   json($rows);
 }
 
-$stmt = db()->prepare("
-  SELECT id, group_id, url, case_id, device, perf_with, perf_without, created_at
-  FROM reports
-  ORDER BY created_at DESC, id DESC
-  LIMIT {$lim}
-");
-$stmt->execute();
-json($stmt->fetchAll());
+json([]);
