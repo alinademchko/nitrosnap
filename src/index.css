@@ -1,6 +1,7 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 @layer base {
   .snapshot-form button {
     @apply w-full px-4 py-[12px] rounded-[12px] font-semibold text-[15px] tracking-[0.02em]
@@ -10,6 +11,9 @@
            hover:bg-[var(--accent-hover)] hover:-translate-y-px hover:shadow-[0_14px_24px_rgba(184,255,242,0.42)]
            active:translate-y-0 active:saturate-[0.98]
            disabled:opacity-[0.65] disabled:cursor-default disabled:translate-y-0 disabled:shadow-none;
+  }
+  img {
+    @apply inline-block !important;
   }
 }
 :root {
@@ -38,4 +42,5 @@ body {
   min-height: 100%;
   padding: 24px;
 }
+
 
